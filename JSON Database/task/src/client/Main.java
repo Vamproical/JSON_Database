@@ -1,52 +1,52 @@
 package client;
 
 import com.beust.jcommander.JCommander;
-import com.beust.jcommander.Parameter;
+import com.google.gson.Gson;
+import server.ArgsParser;
 
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.InetAddress;
+import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class Main {
     private static final String address = "127.0.0.1";
     private static final int port = 23456;
+    private static final Map<String,String> arguments = new LinkedHashMap<>();
 
-    @Parameter(names={"--typeRequest", "-t"})
-    String typeRequest;
-    @Parameter(names={"--index", "-i"})
-    int index;
-    @Parameter(names={"--data", "-m"})
-    String data;
-
-    private void server() {
-        try (
-                Socket socket = new Socket(InetAddress.getByName(address), port);
-                DataInputStream input = new DataInputStream(socket.getInputStream());
-                DataOutputStream output = new DataOutputStream(socket.getOutputStream())
-        ) {
-            String msg = typeRequest + " " + index;
-            if (typeRequest.equals("set")) {
-                msg = typeRequest + " " + index + " " + data;
-            }
-
-            output.writeUTF(msg);
-            System.out.println("Sent: " + msg);
-            String result = input.readUTF();
-            System.out.println("Received: " + result);
-        } catch (IOException ignored) {
-
+    private static void parseArgument(String... clientArgs) {
+        ArgsParser argsParser = new ArgsParser();
+        JCommander.newBuilder()
+                .addObject(argsParser)
+                .build()
+                .parse(clientArgs);
+        arguments.put("type",argsParser.getRequestType());
+        if (!argsParser.getKey().equals("")) {
+            arguments.put("key",argsParser.getKey());
+        }
+        if (!argsParser.getValue().equals("")) {
+            arguments.put("value",argsParser.getValue());
         }
     }
 
     public static void main(String[] args) {
-        Main main = new Main();
         System.out.println("Client started!");
-        JCommander.newBuilder()
-                .addObject(main)
-                .build()
-                .parse(args);
-        main.server();
+        try (
+                Socket socket = new Socket(address, port);
+                DataInputStream input = new DataInputStream(socket.getInputStream());
+                ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream())
+        ) {
+            output.writeObject(args);
+            parseArgument(args);
+            Gson gson = new Gson();
+            String out = gson.toJson(arguments);
+
+            System.out.println("Sent: " + out);
+            System.out.println("Received: " + input.readUTF());
+        } catch (IOException e) {
+            System.out.println("Error! The server is offline.");
+        }
     }
 }

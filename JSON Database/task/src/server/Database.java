@@ -1,51 +1,34 @@
 package server;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class Database {
-    private final String[] json;
+    private final Map<String,String> json;
 
     public Database() {
-        json = new String[1000];
-        for (int i = 0; i < 1000; i++) {
-            json[i] = "";
-        }
+        json = new HashMap<>();
     }
 
-    private String set(int index, String data) {
-        if (index > 1000 || index < 1) {
-            return "ERROR";
+    public boolean set(String key, String data) {
+        json.put(key,data);
+        return true;
+    }
+
+    public String get(String key) {
+        if (json.get(key) == null) {
+            return "";
         } else {
-            json[index - 1] = data;
-            return "OK";
+            return json.get(key);
         }
     }
 
-    private String get(int index) {
-        if (index > 1000 || index < 1 || json[index - 1].equals("")) {
-            return "ERROR";
+    public boolean delete(String key) {
+        if (json.containsKey(key)) {
+            json.remove(key);
+            return true;
         } else {
-            return json[index - 1];
+            return false;
         }
     }
-
-    private String delete(int index) {
-        if (index > 1000 || index < 1) {
-            return "ERROR";
-        } else {
-            json[index - 1] = "";
-            return "OK";
-        }
-    }
-
-    public String runSystem(String typeRequest, int index, String data) {
-        switch (typeRequest) {
-            case "get":
-                return get(index);
-            case "set":
-                return set(index,data);
-            case "delete":
-                return delete(index);
-        }
-        return null;
-    }
-
 }

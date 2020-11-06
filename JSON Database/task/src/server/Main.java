@@ -1,34 +1,22 @@
 package server;
 
 
-import com.beust.jcommander.Parameter;
+import com.beust.jcommander.JCommander;
+import com.google.gson.Gson;
 
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class Main {
     private static final String address = "127.0.0.1";
     private static final int PORT = 23456;
-    private static String typeRequest;
-    private static int index;
-    private static String data;
-
-    private static void parseCommand(String msg) {
-        String[] msgArray = msg.split(" ");
-        typeRequest = msgArray[0];
-        index = Integer.parseInt(msgArray[1]);
-        if (typeRequest.equals("set")) {
-            StringBuilder builder = new StringBuilder();
-            for (int i = 2; i < msgArray.length; i++) {
-                builder.append(msgArray[i]).append(" ");
-            }
-            data = builder.toString();
-        }
-    }
 
     public static void main(String[] args) {
         try (ServerSocket server = new ServerSocket(PORT, 50, InetAddress.getByName(address))) {
@@ -37,19 +25,55 @@ public class Main {
             while (true) {
                 try (
                         Socket socket = server.accept();
-                        DataInputStream input = new DataInputStream(socket.getInputStream());
+                        ObjectInputStream input = new ObjectInputStream(socket.getInputStream());
                         DataOutputStream output = new DataOutputStream(socket.getOutputStream())
                 ) {
-                    String msg = input.readUTF();
-                    if (msg.contains("exit")) {
-                        return;
+                    Map<String, String> answer = new LinkedHashMap<>();
+                    String[] clientArgs = (String[]) input.readObject();
+
+                    ArgsParser argsParser = new ArgsParser();
+                    JCommander.newBuilder()
+                            .addObject(argsParser)
+                            .build()
+                            .parse(clientArgs);
+                    String requestType = argsParser.getRequestType();
+                    String key = argsParser.getKey();
+                    String value = argsParser.getValue();
+                    switch (requestType) {
+                        case ("set"):
+                            if (database.set(key,value)) {
+                                answer.put("response", "OK");
+                            } else {
+                                answer.put("response", "ERROR");
+                            }
+                            break;
+                        case ("get"):
+                            String result = database.get(key);
+                            if (result.equals("")) {
+                                answer.put("response", "ERROR");
+                                answer.put("reason", "No such key");
+                            } else {
+                                answer.put("response", "OK");
+                                answer.put("value", result);
+                            }
+                            break;
+                        case ("delete"):
+                            if (database.delete(key)) {
+                                answer.put("response", "OK");
+                            } else {
+                                answer.put("response", "ERROR");
+                                answer.put("reason", "No such key");
+                            }
+                            break;
+                        default:
+                            System.exit(0);
                     }
-                    parseCommand(msg);
-                    String result = database.runSystem(typeRequest,index,data);
-                    output.writeUTF(result);
+                    Gson gson = new Gson();
+                    String outputResult = gson.toJson(answer);
+                    output.writeUTF(outputResult);
                 }
             }
-        } catch (IOException e) {
+        } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
         }
     }
