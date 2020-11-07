@@ -4,7 +4,7 @@ import com.beust.jcommander.Parameter;
 
 public class ArgsParser {
     @Parameter(names = "-t", description = "Type of the request")
-    private String requestType;
+    private String type = "";
 
     @Parameter(names = "-k", description = "Key")
     private String key = "";
@@ -12,8 +12,11 @@ public class ArgsParser {
     @Parameter(names = "-v", description = "Value to save in the database")
     private String value = "";
 
-    public String getRequestType() {
-        return requestType;
+    @Parameter(names = "-in", description = "File name")
+    private String fileName = "";
+
+    public String getType() {
+        return type;
     }
 
     public String getValue() {
@@ -22,5 +25,14 @@ public class ArgsParser {
 
     public String getKey() {
         return key;
+    }
+
+    public String getFileName() {
+        return fileName;
+    }
+
+    @Override
+    public String toString() {
+        return type + " " + key + " " + value + " " + fileName;
     }
 }

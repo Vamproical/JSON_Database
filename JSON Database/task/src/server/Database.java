@@ -10,9 +10,8 @@ public class Database {
         json = new HashMap<>();
     }
 
-    public boolean set(String key, String data) {
+    public void set(String key, String data) {
         json.put(key,data);
-        return true;
     }
 
     public String get(String key) {

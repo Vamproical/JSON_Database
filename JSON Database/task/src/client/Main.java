@@ -3,6 +3,7 @@ package client;
 import com.beust.jcommander.JCommander;
 import com.google.gson.Gson;
 import server.ArgsParser;
+import server.ReadJson;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -22,12 +23,19 @@ public class Main {
                 .addObject(argsParser)
                 .build()
                 .parse(clientArgs);
-        arguments.put("type",argsParser.getRequestType());
-        if (!argsParser.getKey().equals("")) {
-            arguments.put("key",argsParser.getKey());
-        }
-        if (!argsParser.getValue().equals("")) {
-            arguments.put("value",argsParser.getValue());
+        if (argsParser.getFileName().equals("")) {
+            arguments.put("type", argsParser.getType());
+            if (!argsParser.getKey().equals("")) {
+                arguments.put("key", argsParser.getKey());
+            }
+            if (!argsParser.getValue().equals("")) {
+                arguments.put("value", argsParser.getValue());
+            }
+        } else {
+            Map<String, String> temp = ReadJson.read("C:\\Users\\Никита\\IdeaProjects\\JSON Database\\JSON Database\\task\\src\\client\\data\\" + argsParser.getFileName());
+            arguments.put("type",temp.get("type"));
+            arguments.put("key", temp.get("key"));
+            arguments.put("value", temp.getOrDefault("value",""));
         }
     }
 

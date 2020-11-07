@@ -10,9 +10,11 @@ import java.io.ObjectInputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class Main {
     private static final String address = "127.0.0.1";
@@ -30,35 +32,45 @@ public class Main {
                 ) {
                     Map<String, String> answer = new LinkedHashMap<>();
                     String[] clientArgs = (String[]) input.readObject();
-
+                    Gson gson = new Gson();
+                    ReadWriteLock lock = new ReentrantReadWriteLock();
+                    ExecutorService executor = Executors.newSingleThreadExecutor();
+                    String requestType, key, value, outputResult;
                     ArgsParser argsParser = new ArgsParser();
                     JCommander.newBuilder()
                             .addObject(argsParser)
                             .build()
                             .parse(clientArgs);
-                    String requestType = argsParser.getRequestType();
-                    String key = argsParser.getKey();
-                    String value = argsParser.getValue();
+                    if (argsParser.getFileName().equals("")) {
+                        requestType = argsParser.getType();
+                        key = argsParser.getKey();
+                        value = argsParser.getValue();
+                    } else {
+                        Map<String, String> temp = ReadJson.read("C:\\Users\\Никита\\IdeaProjects\\JSON Database\\JSON Database\\task\\src\\client\\data\\" + argsParser.getFileName());
+                        requestType = temp.get("type");
+                        key = temp.get("key");
+                        value = temp.getOrDefault("value", "");
+                    }
                     switch (requestType) {
                         case ("set"):
-                            if (database.set(key,value)) {
-                                answer.put("response", "OK");
-                            } else {
-                                answer.put("response", "ERROR");
-                            }
+                            executor.submit(() -> database.set(key, value));
+                            answer.put("response", "OK");
                             break;
                         case ("get"):
-                            String result = database.get(key);
-                            if (result.equals("")) {
+                            Future<String> result = executor.submit(() ->  database.get(key));
+                            String res = result.get();
+                            if (res.equals("")) {
                                 answer.put("response", "ERROR");
                                 answer.put("reason", "No such key");
                             } else {
                                 answer.put("response", "OK");
-                                answer.put("value", result);
+                                answer.put("value", res);
                             }
                             break;
                         case ("delete"):
-                            if (database.delete(key)) {
+                            Future<Boolean> bool = executor.submit(() -> database.delete(key));
+                            boolean bool1 = bool.get();
+                            if (bool1) {
                                 answer.put("response", "OK");
                             } else {
                                 answer.put("response", "ERROR");
@@ -66,11 +78,27 @@ public class Main {
                             }
                             break;
                         default:
+                            executor.shutdown();
                             System.exit(0);
+                            answer.put("response", "OK");
+                            try {
+                                if (!executor.awaitTermination(200, TimeUnit.MILLISECONDS)) {
+                                    executor.shutdownNow();
+                                    if (!executor.awaitTermination(200, TimeUnit.MILLISECONDS)) {
+                                        System.err.println("Executor did not terminate");
+                                    }
+                                }
+                            } catch (InterruptedException ie) {
+                                executor.shutdownNow();
+                                Thread.currentThread().interrupt();
+                            }
+
                     }
-                    Gson gson = new Gson();
-                    String outputResult = gson.toJson(answer);
+                    outputResult = gson.toJson(answer);
+                    WriteJson.write(outputResult);
                     output.writeUTF(outputResult);
+                } catch (InterruptedException | ExecutionException e) {
+                    e.printStackTrace();
                 }
             }
         } catch (IOException | ClassNotFoundException e) {
