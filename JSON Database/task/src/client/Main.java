@@ -1,58 +1,65 @@
 package client;
 
 import com.beust.jcommander.JCommander;
+import com.beust.jcommander.Parameter;
 import com.google.gson.Gson;
-import server.ArgsParser;
-import server.ReadJson;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.net.InetAddress;
 import java.net.Socket;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 public class Main {
     private static final String address = "127.0.0.1";
     private static final int port = 23456;
-    private static final Map<String,String> arguments = new LinkedHashMap<>();
-
-    private static void parseArgument(String... clientArgs) {
-        ArgsParser argsParser = new ArgsParser();
-        JCommander.newBuilder()
-                .addObject(argsParser)
-                .build()
-                .parse(clientArgs);
-        if (argsParser.getFileName().equals("")) {
-            arguments.put("type", argsParser.getType());
-            if (!argsParser.getKey().equals("")) {
-                arguments.put("key", argsParser.getKey());
-            }
-            if (!argsParser.getValue().equals("")) {
-                arguments.put("value", argsParser.getValue());
-            }
-        } else {
-            Map<String, String> temp = ReadJson.read("C:\\Users\\Никита\\IdeaProjects\\JSON Database\\JSON Database\\task\\src\\client\\data\\" + argsParser.getFileName());
-            arguments.put("type",temp.get("type"));
-            arguments.put("key", temp.get("key"));
-            arguments.put("value", temp.getOrDefault("value",""));
-        }
-    }
+    @Parameter(names = {"-t"})
+    private static String type;
+    @Parameter(names = {"-k"})
+    private static String key;
+    @Parameter(names = {"-v"})
+    private static String value;
+    @Parameter(names = {"-in"})
+    private static String fileName;
 
     public static void main(String[] args) {
+        Main main = new Main();
+
+        JCommander.newBuilder()
+                .addObject(main)
+                .build()
+                .parse(args);
+        main.run();
+    }
+
+    public void run() {
         System.out.println("Client started!");
         try (
-                Socket socket = new Socket(address, port);
+                Socket socket = new Socket(InetAddress.getByName(address), port);
                 DataInputStream input = new DataInputStream(socket.getInputStream());
-                ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream())
+                DataOutputStream output = new DataOutputStream(socket.getOutputStream())
         ) {
-            output.writeObject(args);
-            parseArgument(args);
-            Gson gson = new Gson();
-            String out = gson.toJson(arguments);
-
-            System.out.println("Sent: " + out);
-            System.out.println("Received: " + input.readUTF());
+            String fileContent = "";
+            if (fileName == null) {
+                fileContent = JsonBuilder.newBuilder()
+                        .addValue("type", type)
+                        .addValue("key", key)
+                        .addValue("value", value).getAsString();
+            } else {
+                String relativePath = "src/client/data/";
+                try {
+                    fileContent = new String(Files.readAllBytes(Paths.get(relativePath + fileName)));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            output.writeUTF(fileContent);
+            System.out.println("Sent: " + fileContent);
+            String msgReceived = input.readUTF().replace("\\\\", "");
+            System.out.println("Received: " + msgReceived);
         } catch (IOException e) {
             System.out.println("Error! The server is offline.");
         }
